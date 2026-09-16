@@ -31,7 +31,9 @@ dotnet build
 Для самостоятельного Windows x64-приложения:
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
-Готовые файлы находятся в `bin\Release\net8.0-windows\win-x64\publish`.
+Готовый одиночный файл находится в `bin\Release\net8.0-windows\win-x64\publish\CladTracker.exe`.
+Он self-contained и не требует установленного .NET Runtime. Для запуска скачайте `CladTracker.exe`
+из artifact `CladTracker-windows-x64` на странице workflow GitHub Actions и запустите двойным кликом.
