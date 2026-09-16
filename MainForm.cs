@@ -15,8 +15,10 @@ public sealed class MainForm : Form
 
     private readonly EntryStore store;
     private readonly BindingSource bindingSource = new();
+    private readonly BindingSource plannedBindingSource = new();
     private readonly List<CladEntry> entries;
     private readonly DataGridView historyGrid = new();
+    private readonly DataGridView plannedGrid = new();
     private readonly ComboBox cladmanSelector = new();
     private readonly NumericUpDown weightInput = new();
     private readonly RadioButton plannedRadio = new();
@@ -144,21 +146,62 @@ public sealed class MainForm : Form
 
     private Control BuildHistoryPanel()
     {
-        var panel = new Panel { Dock = DockStyle.Fill, BackColor = BackgroundColor, Padding = new Padding(0, 16, 0, 0) };
+        var split = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = BackgroundColor,
+            ColumnCount = 2,
+            Padding = new Padding(0, 16, 0, 0)
+        };
+        split.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
+        split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        var planPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 18, 0) };
+        planPanel.Controls.Add(new Label
+        {
+            Text = "Планы",
+            Dock = DockStyle.Top,
+            Height = 34,
+            Font = new Font("Segoe UI Semibold", 13F),
+            ForeColor = Color.FromArgb(130, 180, 220)
+        });
+        ConfigurePlannedGrid();
+        planPanel.Controls.Add(plannedGrid);
+        var deletePlanButton = MakeDeleteButton("Удалить план");
+        deletePlanButton.Click += DeletePlannedEntry;
+        planPanel.Controls.Add(deletePlanButton);
+        split.Controls.Add(planPanel, 0, 0);
+
+        var historyPanel = new Panel { Dock = DockStyle.Fill };
         var title = new Label
         {
-            Text = "История записей",
+            Text = "История кладов (только факт)",
             Dock = DockStyle.Top,
             Height = 34,
             Font = new Font("Segoe UI Semibold", 13F),
             ForeColor = TextColor
         };
-        panel.Controls.Add(title);
+        historyPanel.Controls.Add(title);
 
         ConfigureGrid();
-        panel.Controls.Add(historyGrid);
-        return panel;
+        historyPanel.Controls.Add(historyGrid);
+        var deleteActualButton = MakeDeleteButton("Удалить клад");
+        deleteActualButton.Click += DeleteActualEntry;
+        historyPanel.Controls.Add(deleteActualButton);
+        split.Controls.Add(historyPanel, 1, 0);
+        return split;
     }
+
+    private static Button MakeDeleteButton(string text) => new()
+    {
+        Text = text,
+        Dock = DockStyle.Bottom,
+        Height = 32,
+        FlatStyle = FlatStyle.Flat,
+        BackColor = Color.FromArgb(105, 48, 48),
+        ForeColor = TextColor,
+        Cursor = Cursors.Hand
+    };
 
     private Control BuildTotalsPanel()
     {
@@ -241,40 +284,46 @@ public sealed class MainForm : Form
 
     private void ConfigureGrid()
     {
-        historyGrid.Dock = DockStyle.Fill;
-        historyGrid.BackgroundColor = BackgroundColor;
-        historyGrid.BorderStyle = BorderStyle.None;
-        historyGrid.GridColor = Color.FromArgb(62, 62, 68);
-        historyGrid.RowHeadersVisible = false;
-        historyGrid.AllowUserToAddRows = false;
-        historyGrid.AllowUserToDeleteRows = false;
-        historyGrid.ReadOnly = true;
-        historyGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        ConfigureGridStyle(historyGrid);
         historyGrid.AutoGenerateColumns = false;
-        historyGrid.EnableHeadersVisualStyles = false;
-        historyGrid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
-        {
-            BackColor = PanelColor,
-            ForeColor = MutedTextColor,
-            SelectionBackColor = PanelColor,
-            SelectionForeColor = MutedTextColor,
-            Padding = new Padding(5)
-        };
-        historyGrid.DefaultCellStyle = new DataGridViewCellStyle
-        {
-            BackColor = InputColor,
-            ForeColor = TextColor,
-            SelectionBackColor = Color.FromArgb(86, 67, 43),
-            SelectionForeColor = TextColor,
-            Padding = new Padding(5)
-        };
         AddTextColumn("Дата и время", "CreatedAt", 150);
         AddTextColumn("Кладмен", "CladmanNumber", 90);
         AddTextColumn("Тип", "Type", 130);
         AddTextColumn("Вес", "WeightGrams", 120);
         AddTextColumn("Сумма", "Amount", 150);
+        historyGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Id", DataPropertyName = "Id", Visible = false });
         historyGrid.DataSource = bindingSource;
     }
+
+    private void ConfigurePlannedGrid()
+    {
+        ConfigureGridStyle(plannedGrid);
+        plannedGrid.AutoGenerateColumns = false;
+        AddColumn(plannedGrid, "Кладмен", "CladmanNumber", 80);
+        AddColumn(plannedGrid, "Вес", "WeightGrams", 90);
+        AddColumn(plannedGrid, "Сумма", "Amount", 105);
+        plannedGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Id", DataPropertyName = "Id", Visible = false });
+        plannedGrid.DataSource = plannedBindingSource;
+    }
+
+    private static void ConfigureGridStyle(DataGridView grid)
+    {
+        grid.Dock = DockStyle.Fill;
+        grid.BackgroundColor = BackgroundColor;
+        grid.BorderStyle = BorderStyle.None;
+        grid.GridColor = Color.FromArgb(62, 62, 68);
+        grid.RowHeadersVisible = false;
+        grid.AllowUserToAddRows = false;
+        grid.AllowUserToDeleteRows = false;
+        grid.ReadOnly = true;
+        grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        grid.EnableHeadersVisualStyles = false;
+        grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = PanelColor, ForeColor = MutedTextColor };
+        grid.DefaultCellStyle = new DataGridViewCellStyle { BackColor = InputColor, ForeColor = TextColor, SelectionBackColor = Color.FromArgb(86, 67, 43) };
+    }
+
+    private static void AddColumn(DataGridView grid, string header, string propertyName, int width) =>
+        grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = header, Name = propertyName, Width = width, DataPropertyName = propertyName, SortMode = DataGridViewColumnSortMode.NotSortable });
 
     private void AddTextColumn(string header, string propertyName, int width)
     {
@@ -309,7 +358,9 @@ public sealed class MainForm : Form
 
     private void RefreshView()
     {
-        bindingSource.DataSource = entries.Select(entry => new
+        var actual = entries.Where(entry => entry.Type == EntryType.Actual).ToList();
+        var planned = entries.Where(entry => entry.Type == EntryType.Planned).ToList();
+        bindingSource.DataSource = actual.Select(entry => new
         {
             entry.Id,
             CreatedAt = entry.CreatedAt.ToString("dd.MM.yyyy HH:mm"),
@@ -318,12 +369,32 @@ public sealed class MainForm : Form
             WeightGrams = $"{entry.WeightGrams.ToString("N2", CultureInfo.CurrentCulture)} г",
             Amount = FormatMoney(entry.Amount)
         }).ToList();
-
-        var planned = entries.Where(entry => entry.Type == EntryType.Planned).ToList();
-        var actual = entries.Where(entry => entry.Type == EntryType.Actual).ToList();
+        plannedBindingSource.DataSource = planned.Select(entry => new
+        {
+            entry.Id,
+            CladmanNumber = $"№ {entry.CladmanNumber}",
+            WeightGrams = $"{entry.WeightGrams.ToString("N2", CultureInfo.CurrentCulture)} г",
+            Amount = FormatMoney(entry.Amount)
+        }).ToList();
         plannedTotalLabel.Text = $"{planned.Sum(entry => entry.WeightGrams):N2} г   •   {FormatMoney(planned.Sum(entry => entry.Amount))}";
         actualTotalLabel.Text = $"{actual.Sum(entry => entry.WeightGrams):N2} г   •   {FormatMoney(actual.Sum(entry => entry.Amount))}";
-        recordCountLabel.Text = $"Записей: {entries.Count}";
+        recordCountLabel.Text = $"Кладов: {actual.Count}  •  Планов: {planned.Count}";
+    }
+
+    private void DeleteActualEntry(object? sender, EventArgs e) => DeleteSelectedEntry(historyGrid, "клад");
+
+    private void DeletePlannedEntry(object? sender, EventArgs e) => DeleteSelectedEntry(plannedGrid, "план");
+
+    private void DeleteSelectedEntry(DataGridView grid, string entryName)
+    {
+        if (grid.CurrentRow?.Cells["Id"].Value is not Guid id)
+        {
+            MessageBox.Show($"Выберите {entryName} для удаления.", "Удаление", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        entries.RemoveAll(entry => entry.Id == id);
+        SaveAndRefresh();
     }
 
     private static string FormatMoney(decimal amount) =>
